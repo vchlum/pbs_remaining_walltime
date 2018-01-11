@@ -1,0 +1,190 @@
+#!/usr/bin/env python
+import sys
+import os
+import subprocess
+import json
+import datetime
+import time
+
+now_time = int(time.time())
+
+def run_pbs_cmd(cmd):
+    my_env = os.environ.copy()
+    my_env['PBSPRO_IGNORE_KERBEROS'] = '1'
+
+    try:
+        process = subprocess.Popen(cmd, env=my_env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, err = process.communicate()
+    except Exception as err:
+        print "failed to run pbs cmd %s: %s" % (" ".join(cmd), err)
+        sys.exit(1)
+    
+    return(out)
+
+
+
+def get_timestamp(string_time):
+    return int(time.mktime(datetime.datetime.strptime(string_time, '%a %b %d %H:%M:%S %Y').timetuple()))
+
+
+
+def exec_host2nodes(exec_host):
+    nodes = []
+    exec_host = exec_host.split("+")
+    for host in exec_host:
+        node = host.split("/")[0]
+        if node not in nodes:
+            nodes.append(node)
+    return " ".join(nodes)
+
+
+
+def walltime2sec(walltime_string):
+    walltime = 0
+    multiplier = 1
+    try:
+        for i in reversed(walltime_string.split(":")):
+            walltime = walltime + int(i) * multiplier
+            multiplier = multiplier * 60      
+    except Exception as err:
+         print "filed to convert walltime to sec: %s " % str(err)
+         sys.exit(1)
+    return walltime
+
+
+ 
+def walltime2str(walltime):
+    swalltime = ""
+    negative = False
+    try:
+        if walltime < 0:
+            negative = True
+            walltime = walltime * -1
+        swalltime = str(walltime / 3600) + ":"
+        mod = walltime % 3600
+        swalltime = swalltime + str(mod / 60) + ":" + str(mod % 60)        
+        
+        if negative:
+            swalltime = "-" + swalltime 
+    except Exception as err:
+         print "filed to convert walltime to string: %s " % str(err)
+         sys.exit(1)
+    return swalltime
+
+
+
+def print_job(jobid, jjob, human, negative):
+        if jjob["job_state"] == "R":
+            try:
+                stime = get_timestamp(jjob["stime"])
+            except:
+                stime = None
+
+            walltime = walltime2sec(jjob["Resource_List"]["walltime"])
+            exec_host = jjob["exec_host"]
+
+            try:
+                if negative:
+                    if stime + walltime > now_time:
+                        # skip job
+                        return
+
+                remaining_walltime = (stime + walltime) - now_time
+                
+                if human:
+                    remaining_walltime = walltime2str(remaining_walltime)
+                
+                print "%s %s %s" % (jobid, str(remaining_walltime), exec_host2nodes(exec_host))
+            except Exception as err: 
+                print "%s UNKNOWN %s" % (jobid, exec_host2nodes(exec_host))
+
+
+
+def print_all_running_jobs_from_data(data, human, negative):
+    try:
+       jdata = json.loads(data)
+    except Exception as err:
+       print "failed to parse json: %s" % err
+       sys.exit(1)
+       
+    for job in jdata["Jobs"]:
+        if jdata["Jobs"][job]["job_state"] == "R": 
+            print_job(job, jdata["Jobs"][job], human, negative);
+
+    return
+
+
+
+def print_all_running_jobs(human, negative):
+    print_all_running_jobs_from_data(run_pbs_cmd(['qstat', '-ft', '-Fjson']), human, negative)
+
+
+
+def get_jobs_from_node(node):
+    jobs = []
+    
+    pbsnodes = run_pbs_cmd(['pbsnodes', '-v', node])
+    
+    for line in pbsnodes.split("\n"):
+        line = line.strip().split("=")
+        if line[0].strip() == "jobs":
+            line = line[1].replace(" ","")
+            for job in line.split(","):
+                jobid = job.split("/")[0]
+                if jobid not in jobs:
+                    jobs.append(jobid)
+
+    return jobs
+    
+
+
+def print_node_jobs(node, human, negative):
+    jobs = []
+    
+    jobs = get_jobs_from_node(node)
+    
+    if jobs == None:
+        return
+        
+    for job in jobs:
+        print_all_running_jobs_from_data(run_pbs_cmd(['qstat', '-ft', '-Fjson', job]), human, negative)
+
+
+
+def print_usage():
+    print "Usage: " + sys.argv[0] + " [-help] [-h] [-n] [node1 [node2 [...]]]"
+    print "    h - human readable walltime"
+    print "    n - print negative walltime only (or UNKNOWN)"
+    print "    node - print only jobs running on this node"
+    print "         - use short node name"
+
+
+
+def main(argv):
+    human = False
+    negative = False
+    nodes = []
+
+
+    for arg in argv:
+        if arg == "-help":
+            print_usage()
+            sys.exit(0)
+        elif arg == "-h":
+           human = True
+        elif arg == "-n":
+           negative = True
+        elif not arg.startswith("-"):
+           nodes.append(arg)
+        else:              
+            print_usage()
+            sys.exit(0)
+               
+    if nodes == []:
+        print_all_running_jobs(human, negative)
+    else:
+        for node in nodes:
+            print_node_jobs(node, human, negative)
+
+if __name__ == "__main__":
+   main(sys.argv[1:])
