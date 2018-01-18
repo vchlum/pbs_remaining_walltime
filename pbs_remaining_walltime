@@ -60,9 +60,9 @@ def walltime2str(walltime):
         if walltime < 0:
             negative = True
             walltime = walltime * -1
-        swalltime = str(walltime / 3600) + ":"
+        swalltime = str(walltime / 3600)
         mod = walltime % 3600
-        swalltime = swalltime + str(mod / 60) + ":" + str(mod % 60)        
+        swalltime = "%s:%02d:%02d" % (swalltime, int(mod / 60), mod % 60)
         
         if negative:
             swalltime = "-" + swalltime 
@@ -110,8 +110,6 @@ def print_all_running_jobs_from_data(data, human, negative):
     for job in jdata["Jobs"]:
         if jdata["Jobs"][job]["job_state"] == "R": 
             print_job(job, jdata["Jobs"][job], human, negative);
-
-    return
 
 
 
