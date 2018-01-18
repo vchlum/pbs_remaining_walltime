@@ -47,7 +47,7 @@ def walltime2sec(walltime_string):
             walltime = walltime + int(i) * multiplier
             multiplier = multiplier * 60      
     except Exception as err:
-         print "filed to convert walltime to sec: %s " % str(err)
+         print "failed to convert walltime to sec: %s " % str(err)
          sys.exit(1)
     return walltime
 
@@ -67,7 +67,7 @@ def walltime2str(walltime):
         if negative:
             swalltime = "-" + swalltime 
     except Exception as err:
-         print "filed to convert walltime to string: %s " % str(err)
+         print "failed to convert walltime to string: %s " % str(err)
          sys.exit(1)
     return swalltime
 
