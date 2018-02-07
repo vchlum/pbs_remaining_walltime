@@ -81,22 +81,27 @@ def print_job(jobid, jjob, human, negative):
                 stime = None
 
             walltime = walltime2sec(jjob["Resource_List"]["walltime"])
+            used_walltime = walltime2sec(jjob["resources_used"]["walltime"])
             exec_host = jjob["exec_host"]
 
             try:
-                if negative:
-                    if stime + walltime > now_time:
-                        # skip job
-                        return
-
-                remaining_walltime = (stime + walltime) - now_time
-                
-                if human:
-                    remaining_walltime = walltime2str(remaining_walltime)
-                
-                print "%s %s %s" % (jobid, str(remaining_walltime), exec_host2nodes(exec_host))
-            except Exception as err: 
+                if stime:
+                    remaining_walltime = (stime + walltime) - now_time
+                else:
+                    remaining_walltime = walltime - used_walltime
+            except Exception as err:
                 print "%s UNKNOWN %s" % (jobid, exec_host2nodes(exec_host))
+                return
+
+            if negative:
+                if remaining_walltime > 0:
+                    # skip job
+                    return
+
+            if human:
+                remaining_walltime = walltime2str(remaining_walltime)
+
+            print "%s %s %s" % (jobid, str(remaining_walltime), exec_host2nodes(exec_host))
 
 
 
