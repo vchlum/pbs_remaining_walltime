@@ -94,9 +94,20 @@ def print_job(jobid, jjob, human, negative):
             except:
                 stime = None
 
-            walltime = walltime2sec(jjob["Resource_List"]["walltime"])
-            used_walltime = walltime2sec(jjob["resources_used"]["walltime"])
-            exec_host = jjob["exec_host"]
+            try:
+                exec_host = jjob["exec_host"]
+            except Exception as err:
+                exec_host = "UNKNOWN"
+
+            try:
+                walltime = walltime2sec(jjob["Resource_List"]["walltime"])
+            except Exception as err:
+                pass
+
+            try:
+                used_walltime = walltime2sec(jjob["resources_used"]["walltime"])
+            except Exception as err:
+                pass
 
             try:
                 if stime:
